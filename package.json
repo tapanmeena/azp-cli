@@ -1,0 +1,45 @@
+{
+  "name": "azp-cli",
+  "version": "1.0.0",
+  "description": "Terminal app to manage Azure PIM role activations",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node -r tsconfig-paths/register src/index.ts",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": [
+    "azure",
+    "pim",
+    "privileged-identity-management",
+    "cli",
+    "terminal"
+  ],
+  "author": {
+    "name": "Tapan Meena",
+    "email": "tapanmeena1998@gmail.com"
+  },
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.0",
+  "dependencies": {
+    "@azure/arm-authorization": "^9.0.0",
+    "@azure/arm-resources-subscriptions": "^2.1.0",
+    "@azure/identity": "^4.13.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "inquirer": "^13.1.0",
+    "isomorphic-fetch": "^3.0.0",
+    "ora": "^9.0.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/node": "^25.0.5",
+    "esbuild": "^0.27.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
+  }
+}
