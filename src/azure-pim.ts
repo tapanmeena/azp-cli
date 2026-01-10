@@ -1,8 +1,18 @@
 import { AuthorizationManagementClient } from "@azure/arm-authorization";
 import { SubscriptionClient } from "@azure/arm-resources-subscriptions";
 import { AzureCliCredential } from "@azure/identity";
-import chalk from "chalk";
 import { v4 as uuidv4 } from "uuid";
+import {
+  failSpinner,
+  formatStatus,
+  logBlank,
+  logError,
+  logSuccess,
+  logWarning,
+  startSpinner,
+  succeedSpinner,
+  warnSpinner,
+} from "@/ui";
 
 export interface AzureSubscription {
   subscriptionId: string;
@@ -46,7 +56,7 @@ export interface AzureActivationRequest {
 }
 
 export const fetchSubscriptions = async (credential: AzureCliCredential): Promise<AzureSubscription[]> => {
-  console.log(chalk.blueBright("Fetching Azure subscriptions..."));
+  startSpinner("Fetching Azure subscriptions...");
 
   const subscriptionClient = new SubscriptionClient(credential);
   const subscriptions: AzureSubscription[] = [];
@@ -59,7 +69,7 @@ export const fetchSubscriptions = async (credential: AzureCliCredential): Promis
     });
   }
 
-  console.log(chalk.greenBright(`Fetched ${subscriptions.length} subscriptions.`));
+  succeedSpinner(`Found ${subscriptions.length} subscription(s)`);
   return subscriptions;
 };
 
@@ -69,7 +79,7 @@ export const fetchEligibleRolesForSubscription = async (
   subscriptionName: string,
   principalId: string
 ): Promise<EligibleAzureRole[]> => {
-  console.log(chalk.blueBright(`Fetching eligible roles for subscription ${subscriptionName}...`));
+  startSpinner(`Fetching eligible roles for "${subscriptionName}"...`);
 
   const client = new AuthorizationManagementClient(credential, subscriptionId);
   const scope = `/subscriptions/${subscriptionId}`;
@@ -95,13 +105,14 @@ export const fetchEligibleRolesForSubscription = async (
       }
     }
 
-    console.log(chalk.greenBright(`Fetched ${eligibleRoles.length} eligible roles for subscription ${subscriptionName}.`));
+    succeedSpinner(`Found ${eligibleRoles.length} eligible role(s) for "${subscriptionName}"`);
     return eligibleRoles;
   } catch (error: any) {
     if (error.statusCode === 403 || error.code === "AuthorizationFailed") {
-      console.log(chalk.redBright(`Insufficient permissions to fetch eligible roles for subscription ${subscriptionId}.`));
+      warnSpinner(`Insufficient permissions for subscription "${subscriptionName}"`);
       return [];
     }
+    failSpinner(`Failed to fetch eligible roles for "${subscriptionName}"`);
     throw error;
   }
 };
@@ -112,7 +123,7 @@ export const listActiveAzureRoles = async (
   subscriptionName: string,
   principalId: string
 ): Promise<ActiveAzureRole[]> => {
-  console.log(chalk.blueBright(`Fetching active roles for subscription ${subscriptionName}...`));
+  startSpinner(`Fetching active roles for "${subscriptionName}"...`);
 
   const client = new AuthorizationManagementClient(credential, subscriptionId);
   const scope = `/subscriptions/${subscriptionId}`;
@@ -141,13 +152,14 @@ export const listActiveAzureRoles = async (
       }
     }
 
-    console.log(chalk.greenBright(`Fetched ${activeRoles.length} active roles for subscription ${subscriptionName}.`));
+    succeedSpinner(`Found ${activeRoles.length} active role(s) for "${subscriptionName}"`);
     return activeRoles;
   } catch (error: any) {
     if (error.statusCode === 403 || error.code === "AuthorizationFailed") {
-      console.log(chalk.redBright(`Insufficient permissions to fetch active roles for subscription ${subscriptionId}.`));
+      warnSpinner(`Insufficient permissions for subscription "${subscriptionName}"`);
       return [];
     }
+    failSpinner(`Failed to fetch active roles for "${subscriptionName}"`);
     throw error;
   }
 };
@@ -177,25 +189,28 @@ export const activateAzureRole = async (credential: AzureCliCredential, request:
     justification: request.justification,
   };
 
-  console.log(chalk.blueBright(`Submitting activation request for role ${request.roleName}...`));
+  startSpinner(`Activating role "${request.roleName}"...`);
 
   try {
     const response = await client.roleAssignmentScheduleRequests.create(request.scope, requestName, requestBody);
 
-    console.log(chalk.greenBright("Activation request submitted successfully."));
-    console.log(chalk.greenBright(`Role Assignment Schedule Request ID: ${response.id}`));
+    succeedSpinner(`Activation request submitted for "${request.roleName}"`);
+    logBlank();
 
-    if (response.status === "Approved") {
-      console.log(chalk.greenBright("Your role activation has been approved."));
+    if (response.status) {
+      console.log(`   Status: ${formatStatus(response.status)}`);
+    }
+
+    if (response.status === "Approved" || response.status === "Provisioned") {
+      logSuccess(`Role "${request.roleName}" has been activated successfully`);
     } else if (response.status === "Denied") {
-      console.log(chalk.redBright("Your role activation has been denied."));
+      logError(`Role activation for "${request.roleName}" has been denied`);
     } else if (response.status === "PendingApproval") {
-      console.log(chalk.yellowBright("Your role activation is pending approval."));
-    } else {
-      console.log(chalk.yellowBright(`Your role activation is currently in status: ${response.status}`));
+      logWarning(`Role activation for "${request.roleName}" is pending approval`);
     }
   } catch (error) {
-    console.error(chalk.redBright("Failed to submit activation request:", error));
+    failSpinner(`Failed to activate role "${request.roleName}"`);
+    throw error;
   }
 };
 
@@ -205,19 +220,28 @@ export const deactivateAzureRole = async (
   roleEligibilityScheduleId: string,
   subscriptionId: string,
   principalId: string,
-  roleDefinitionId: string
+  roleDefinitionId: string,
+  roleName?: string
 ): Promise<void> => {
   const client = new AuthorizationManagementClient(credential, subscriptionId);
   const requestName = uuidv4();
+  const displayName = roleName || "role";
 
-  const response = await client.roleAssignmentScheduleRequests.create(scope, requestName, {
-    principalId,
-    roleDefinitionId,
-    requestType: "SelfDeactivate",
-    linkedRoleEligibilityScheduleId: roleEligibilityScheduleId,
-  });
+  startSpinner(`Deactivating "${displayName}"...`);
 
-  console.log(chalk.greenBright(`Deactivation request submitted successfully - ${response.name}`));
+  try {
+    await client.roleAssignmentScheduleRequests.create(scope, requestName, {
+      principalId,
+      roleDefinitionId,
+      requestType: "SelfDeactivate",
+      linkedRoleEligibilityScheduleId: roleEligibilityScheduleId,
+    });
+
+    succeedSpinner(`Successfully deactivated "${displayName}"`);
+  } catch (error) {
+    failSpinner(`Failed to deactivate "${displayName}"`);
+    throw error;
+  }
 };
 
 const getScopeDisplayName = (scope: string): string => {

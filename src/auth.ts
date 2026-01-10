@@ -1,7 +1,7 @@
 import { AzureCliCredential } from "@azure/identity";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
-import chalk from "chalk";
+import { failSpinner, showSummary, startSpinner, succeedSpinner } from "@/ui";
 
 const GRAPH_SCOPES = ["https://graph.microsoft.com/.default"];
 
@@ -24,28 +24,37 @@ const getCredential = (): AzureCliCredential => {
 };
 
 export const authenticate = async (): Promise<AuthContext> => {
-  console.log(chalk.blueBright("Authenticating with Azure CLI..."));
+  startSpinner("Authenticating with Azure CLI...");
 
-  const credential = getCredential();
+  try {
+    const credential = getCredential();
 
-  // Create Microsoft Graph client
-  const authProvider = new TokenCredentialAuthenticationProvider(credential, { scopes: GRAPH_SCOPES });
+    // Create Microsoft Graph client
+    const authProvider = new TokenCredentialAuthenticationProvider(credential, { scopes: GRAPH_SCOPES });
 
-  const graphClient = Client.initWithMiddleware({ authProvider, defaultVersion: "v1.0" });
+    const graphClient = Client.initWithMiddleware({ authProvider, defaultVersion: "v1.0" });
 
-  // Get user details
-  const user = await graphClient.api("/me").header("Accept-Language", "en-US").select("id,userPrincipalName,displayName").get();
-  const userId = user.id;
-  const userPrincipalName = user.userPrincipalName;
+    // Get user details
+    const user = await graphClient.api("/me").header("Accept-Language", "en-US").select("id,userPrincipalName,displayName").get();
+    const userId = user.id;
+    const userPrincipalName = user.userPrincipalName;
 
-  console.log(chalk.greenBright(`Authenticated as ${user.displayName} (ID: ${userPrincipalName})`));
+    succeedSpinner("Authentication successful");
+    showSummary("User Information", [
+      { label: "Name", value: user.displayName },
+      { label: "Email", value: userPrincipalName },
+    ]);
 
-  return {
-    credential,
-    graphClient,
-    userId,
-    userPrincipalName,
-  };
+    return {
+      credential,
+      graphClient,
+      userId,
+      userPrincipalName,
+    };
+  } catch (error) {
+    failSpinner("Authentication failed");
+    throw error;
+  }
 };
 
 export const getArmToken = async (credential: AzureCliCredential): Promise<string> => {
