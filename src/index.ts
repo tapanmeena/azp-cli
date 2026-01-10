@@ -1,6 +1,6 @@
 import { authenticate } from "@/auth";
 import { showMainMenu } from "@/cli";
-import chalk from "chalk";
+import { logBlank, logDim, logError, showHeader } from "@/ui";
 import { Command } from "commander";
 import { version } from "../package.json";
 
@@ -14,6 +14,9 @@ program
   .alias("a")
   .action(async () => {
     try {
+      // Show header
+      showHeader();
+
       // Authenticate
       const authContext = await authenticate();
 
@@ -21,12 +24,21 @@ program
       await showMainMenu(authContext);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(chalk.redBright(`An error occurred during activation: ${errorMessage}`));
+      logBlank();
+      logError(`An error occurred: ${errorMessage}`);
 
       if (errorMessage.includes("AADSTS")) {
-        console.log(chalk.redBright("Authentication error detected. Please ensure you have the necessary permissions and try again."));
+        logBlank();
+        logError("Authentication error detected. Please ensure you have the necessary permissions and try again.");
+        logDim("Tip: Make sure you are logged in with 'az login' before running this command.");
       }
 
+      if (errorMessage.includes("Azure CLI not found") || errorMessage.includes("AzureCliCredential")) {
+        logBlank();
+        logDim("Tip: Make sure Azure CLI is installed and you are logged in with 'az login'.");
+      }
+
+      logBlank();
       process.exit(1);
     }
   });
@@ -36,13 +48,15 @@ program
   .description("Deactivate a role in Azure PIM")
   .alias("d")
   .action(async () => {
-    console.log("Deactivate role command invoked");
+    showHeader();
+    logDim("Deactivate role command invoked - use the main menu to deactivate roles.");
   });
 
 program
   .command("help")
   .description("Display help information about azp-cli commands")
   .action(() => {
+    showHeader();
     program.outputHelp();
   });
 

@@ -7,38 +7,57 @@ import {
   fetchSubscriptions,
   listActiveAzureRoles,
 } from "@/azure-pim";
+import {
+  formatActiveRole,
+  formatRole,
+  formatSubscription,
+  logBlank,
+  logDim,
+  logError,
+  logInfo,
+  logSuccess,
+  logWarning,
+  showDivider,
+  showSummary,
+} from "@/ui";
+import chalk from "chalk";
 import inquirer from "inquirer";
 
 const promptBackToMainMenuOrExit = async (message: string): Promise<void> => {
+  logBlank();
   const { next } = await inquirer.prompt<{ next: "back" | "exit" }>([
     {
       type: "select",
       name: "next",
-      message,
+      message: chalk.yellow(message),
       choices: [
-        { name: "Back to Main Menu", value: "back" },
-        { name: "Exit", value: "exit" },
+        { name: chalk.cyan("↩ Back to Main Menu"), value: "back" },
+        { name: chalk.red("✕ Exit"), value: "exit" },
       ],
       default: "back",
     },
   ]);
 
   if (next === "exit") {
+    logBlank();
+    logDim("Goodbye! 👋");
     process.exit(0);
   }
 };
 
 export const showMainMenu = async (authContext: AuthContext): Promise<void> => {
   while (true) {
+    showDivider();
+    logBlank();
     const { action } = await inquirer.prompt<{ action: "activate" | "deactivate" | "exit" }>([
       {
         type: "select",
         name: "action",
-        message: "Main Menu - Select an action:",
+        message: chalk.cyan.bold("What would you like to do?"),
         choices: [
-          { name: "Activate Role(s)", value: "activate" },
-          { name: "Deactivate Role(s)", value: "deactivate" },
-          { name: "Exit", value: "exit" },
+          { name: chalk.green("▶ Activate Role(s)"), value: "activate" },
+          { name: chalk.yellow("◼ Deactivate Role(s)"), value: "deactivate" },
+          { name: chalk.red("✕ Exit"), value: "exit" },
         ],
         default: "activate",
       },
@@ -52,7 +71,9 @@ export const showMainMenu = async (authContext: AuthContext): Promise<void> => {
         await handleDeactivation(authContext);
         break;
       case "exit":
-        console.log("Exiting...");
+        logBlank();
+        logDim("Goodbye! 👋");
+        logBlank();
         return;
     }
   }
@@ -60,29 +81,34 @@ export const showMainMenu = async (authContext: AuthContext): Promise<void> => {
 
 export const handleActivation = async (authContext: AuthContext): Promise<void> => {
   try {
+    logBlank();
+    logInfo("Starting role activation flow...");
+    logBlank();
+
     const subscriptions = await fetchSubscriptions(authContext.credential);
 
     if (subscriptions.length === 0) {
-      console.log("No subscriptions found.");
-      await promptBackToMainMenuOrExit("No subscriptions found. What would you like to do?");
+      logWarning("No subscriptions found.");
+      await promptBackToMainMenuOrExit("What would you like to do?");
       return;
     }
 
     const BACK_VALUE = "__BACK__";
     const subscriptionChoices = subscriptions
       .map((sub) => ({
-        name: `${sub.displayName} (${sub.subscriptionId})`,
+        name: formatSubscription(sub.displayName, sub.subscriptionId),
         value: sub.subscriptionId,
       }))
-      .concat([{ name: "Back to Main Menu", value: BACK_VALUE }]);
+      .concat([{ name: chalk.dim("↩ Back to Main Menu"), value: BACK_VALUE }]);
 
+    logBlank();
     const { selectedSubscriptionId } = await inquirer.prompt<{
       selectedSubscriptionId: string;
     }>([
       {
         type: "select",
         name: "selectedSubscriptionId",
-        message: "Select a subscription:",
+        message: chalk.cyan("Select a subscription:"),
         choices: subscriptionChoices,
         pageSize: 15,
         default: subscriptionChoices[0]?.value,
@@ -90,13 +116,13 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
     ]);
 
     if (selectedSubscriptionId === BACK_VALUE) {
-      console.log("Returning to main menu...");
+      logDim("Returning to main menu...");
       return;
     }
 
     const selectedSubscription = subscriptions.find((sub) => sub.subscriptionId === selectedSubscriptionId);
     if (!selectedSubscription) {
-      console.error("Selected subscription not found.");
+      logError("Selected subscription not found.");
       return;
     }
 
@@ -108,24 +134,25 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
     );
 
     if (eligibleRoles.length === 0) {
-      console.log("No eligible roles found for the selected subscription.");
-      await promptBackToMainMenuOrExit("No eligible roles found. What would you like to do?");
+      logWarning("No eligible roles found for the selected subscription.");
+      await promptBackToMainMenuOrExit("What would you like to do?");
       return;
     }
 
+    logBlank();
     const { rolesToActivate } = await inquirer.prompt([
       {
         type: "checkbox",
         name: "rolesToActivate",
-        message: "Select roles to activate:",
+        message: chalk.cyan("Select role(s) to activate:"),
         choices: eligibleRoles.map((role) => ({
-          name: `${role.roleName} - ${role.scopeDisplayName}`,
+          name: formatRole(role.roleName, role.scopeDisplayName),
           value: role.id,
           checked: false,
         })),
         validate: (answer) => {
           if (answer.length < 1) {
-            return "You must choose at least one role.";
+            return chalk.red("You must choose at least one role.");
           }
           return true;
         },
@@ -133,86 +160,123 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
       },
     ]);
 
+    logBlank();
     const activationDetails = await inquirer.prompt([
       {
         type: "number",
         name: "durationHours",
-        message: "Duration (hours, max 8):",
+        message: chalk.cyan("Duration (hours, max 8):"),
         default: 8,
         validate: (value) => {
-          if (!value) return "Please enter a valid number.";
+          if (!value) return chalk.red("Please enter a valid number.");
           if (value >= 1 && value <= 8) return true;
-          return "Please enter a value between 1 and 8.";
+          return chalk.red("Please enter a value between 1 and 8.");
         },
       },
       {
         type: "input",
         name: "justification",
-        message: "Justification for activation:",
+        message: chalk.cyan("Justification for activation:"),
         default: "Activated via azp-cli",
         validate: (value) => {
           if (value.trim().length >= 5) return true;
-          return "Justification should be at least 5 characters long.";
+          return chalk.red("Justification should be at least 5 characters long.");
         },
       },
+    ]);
+
+    // Show summary before confirmation
+    const selectedRoleNames = rolesToActivate
+      .map((roleId: string) => {
+        const role = eligibleRoles.find((r) => r.id === roleId);
+        return role ? `${role.roleName} @ ${role.scopeDisplayName}` : roleId;
+      })
+      .join(", ");
+
+    showSummary("Activation Summary", [
+      { label: "Subscription", value: selectedSubscription.displayName },
+      { label: "Role(s)", value: selectedRoleNames },
+      { label: "Duration", value: `${activationDetails.durationHours} hour(s)` },
+      { label: "Justification", value: activationDetails.justification },
     ]);
 
     const { confirmActivation } = await inquirer.prompt([
       {
         type: "confirm",
         name: "confirmActivation",
-        message: `Confirm activation of ${rolesToActivate.length} role(s) for ${activationDetails.durationHours} hour(s)?`,
+        message: chalk.yellow(`Confirm activation of ${rolesToActivate.length} role(s)?`),
         default: true,
       },
     ]);
 
     if (!confirmActivation) {
-      console.log("Activation cancelled by user.");
+      logWarning("Activation cancelled by user.");
       return;
     }
 
-    console.log("Proceeding with activation...");
-    await Promise.all(
-      rolesToActivate.map(async (roleId: string) => {
-        const role = eligibleRoles.find((r) => r.id === roleId);
-        if (!role) {
-          console.error(`Role with ID ${roleId} not found among eligible roles.`);
-          return;
-        }
+    logBlank();
+    logInfo(`Activating ${rolesToActivate.length} role(s)...`);
+    logBlank();
 
-        try {
-          await activateAzureRole(
-            authContext.credential,
-            {
-              principalId: authContext.userId,
-              roleDefinitionId: role.roleDefinitionId,
-              roleName: `${role.roleName} - ${role.scopeDisplayName}`,
-              roleEligibilityScheduleId: role.roleEligibilityScheduleId,
-              scope: role.scope,
-              durationHours: activationDetails.durationHours,
-              justification: activationDetails.justification,
-            },
-            selectedSubscription.subscriptionId
-          );
-        } catch (error) {
-          console.error(`Failed to activate role ${role.roleName}:`, error);
-        }
-      })
-    );
-  } catch (error) {
-    console.error("Error fetching subscriptions:", error);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const roleId of rolesToActivate as string[]) {
+      const role = eligibleRoles.find((r) => r.id === roleId);
+      if (!role) {
+        logError(`Role with ID ${roleId} not found among eligible roles.`);
+        failCount++;
+        continue;
+      }
+
+      try {
+        await activateAzureRole(
+          authContext.credential,
+          {
+            principalId: authContext.userId,
+            roleDefinitionId: role.roleDefinitionId,
+            roleName: `${role.roleName} @ ${role.scopeDisplayName}`,
+            roleEligibilityScheduleId: role.roleEligibilityScheduleId,
+            scope: role.scope,
+            durationHours: activationDetails.durationHours,
+            justification: activationDetails.justification,
+          },
+          selectedSubscription.subscriptionId
+        );
+        successCount++;
+      } catch (error: any) {
+        logError(`Failed to activate role "${role.roleName}": ${error.message || error}`);
+        failCount++;
+      }
+    }
+
+    logBlank();
+    showDivider();
+    if (successCount > 0 && failCount === 0) {
+      logSuccess(`All ${successCount} role(s) activated successfully!`);
+    } else if (successCount > 0 && failCount > 0) {
+      logWarning(`${successCount} role(s) activated, ${failCount} failed.`);
+    } else {
+      logError(`All ${failCount} role activation(s) failed.`);
+    }
+  } catch (error: any) {
+    logError(`Error during activation: ${error.message || error}`);
     return;
   }
 };
 
 export const handleDeactivation = async (authContext: AuthContext): Promise<void> => {
   try {
+    logBlank();
+    logInfo("Starting role deactivation flow...");
+    logBlank();
+
     const subscriptions = await fetchSubscriptions(authContext.credential);
     let activeAzureRoles: ActiveAzureRole[] = [];
 
     if (subscriptions.length === 0) {
-      console.log("No subscriptions found.");
-      await promptBackToMainMenuOrExit("No subscriptions found. What would you like to do?");
+      logWarning("No subscriptions found.");
+      await promptBackToMainMenuOrExit("What would you like to do?");
       return;
     }
 
@@ -222,24 +286,23 @@ export const handleDeactivation = async (authContext: AuthContext): Promise<void
     }
 
     if (activeAzureRoles.length === 0) {
-      console.log("No active roles found for deactivation.");
-      await promptBackToMainMenuOrExit("No active roles found. What would you like to do?");
+      logWarning("No active roles found for deactivation.");
+      await promptBackToMainMenuOrExit("What would you like to do?");
       return;
     }
 
     const BACK_VALUE = "__BACK__";
 
+    logBlank();
     const { rolesToDeactivate } = await inquirer.prompt([
       {
         type: "checkbox",
         name: "rolesToDeactivate",
-        message: "Select roles to deactivate:",
+        message: chalk.cyan("Select role(s) to deactivate:"),
         choices: [
-          { name: "Back to Main Menu", value: BACK_VALUE },
+          { name: chalk.dim("↩ Back to Main Menu"), value: BACK_VALUE },
           ...activeAzureRoles.map((role) => ({
-            name: `${role.roleName} - ${role.scopeDisplayName} (${role.subscriptionName}) (Activated on: ${new Date(
-              role.startDateTime
-            ).toLocaleString()})`,
+            name: formatActiveRole(role.roleName, role.scopeDisplayName, role.subscriptionName, role.startDateTime),
             value: role.id,
             checked: false,
           })),
@@ -249,7 +312,7 @@ export const handleDeactivation = async (authContext: AuthContext): Promise<void
             return true;
           }
           if (answer.length < 1) {
-            return "You must choose at least one role.";
+            return chalk.red("You must choose at least one role.");
           }
           return true;
         },
@@ -262,52 +325,77 @@ export const handleDeactivation = async (authContext: AuthContext): Promise<void
       : (rolesToDeactivate as string[]);
 
     if ((rolesToDeactivate as string[]).includes(BACK_VALUE) && selectedRoleIds.length === 0) {
-      console.log("Returning to main menu...");
+      logDim("Returning to main menu...");
       return;
     }
+
+    // Show summary before confirmation
+    const selectedRoleNames = selectedRoleIds
+      .map((roleId) => {
+        const role = activeAzureRoles.find((r) => r.id === roleId);
+        return role ? `${role.roleName} @ ${role.scopeDisplayName}` : roleId;
+      })
+      .join(", ");
+
+    showSummary("Deactivation Summary", [{ label: "Role(s) to deactivate", value: selectedRoleNames }]);
 
     const { confirmDeactivation } = await inquirer.prompt([
       {
         type: "confirm",
         name: "confirmDeactivation",
-        message: `Confirm deactivation of ${selectedRoleIds.length} role(s)?`,
+        message: chalk.yellow(`Confirm deactivation of ${selectedRoleIds.length} role(s)?`),
         default: true,
       },
     ]);
 
     if (!confirmDeactivation) {
-      console.log("Deactivation cancelled by user.");
+      logWarning("Deactivation cancelled by user.");
       return;
     }
 
-    console.log("Proceeding with deactivation...");
+    logBlank();
+    logInfo(`Deactivating ${selectedRoleIds.length} role(s)...`);
+    logBlank();
 
-    await Promise.all(
-      selectedRoleIds.map(async (roleId: string) => {
-        const role = activeAzureRoles.find((r) => r.id === roleId);
-        if (!role) {
-          console.error(`Role with ID ${roleId} not found among active roles.`);
-          return;
-        }
+    let successCount = 0;
+    let failCount = 0;
 
-        try {
-          // Deactivation logic to be implemented
-          console.log(`Deactivating role: ${role.roleName} - ${role.scopeDisplayName}`);
-          await deactivateAzureRole(
-            authContext.credential,
-            role.scope,
-            role.linkedRoleEligibilityScheduleId,
-            role.subscriptionId,
-            authContext.userId,
-            role.roleDefinitionId
-          );
-        } catch (error) {
-          console.error(`Failed to deactivate role ${role.roleName}:`, error);
-        }
-      })
-    );
-  } catch (error) {
-    console.error("Error fetching subscriptions for deactivation:", error);
+    for (const roleId of selectedRoleIds) {
+      const role = activeAzureRoles.find((r) => r.id === roleId);
+      if (!role) {
+        logError(`Role with ID ${roleId} not found among active roles.`);
+        failCount++;
+        continue;
+      }
+
+      try {
+        await deactivateAzureRole(
+          authContext.credential,
+          role.scope,
+          role.linkedRoleEligibilityScheduleId,
+          role.subscriptionId,
+          authContext.userId,
+          role.roleDefinitionId,
+          `${role.roleName} @ ${role.scopeDisplayName}`
+        );
+        successCount++;
+      } catch (error: any) {
+        logError(`Failed to deactivate role "${role.roleName}": ${error.message || error}`);
+        failCount++;
+      }
+    }
+
+    logBlank();
+    showDivider();
+    if (successCount > 0 && failCount === 0) {
+      logSuccess(`All ${successCount} role(s) deactivated successfully!`);
+    } else if (successCount > 0 && failCount > 0) {
+      logWarning(`${successCount} role(s) deactivated, ${failCount} failed.`);
+    } else {
+      logError(`All ${failCount} role deactivation(s) failed.`);
+    }
+  } catch (error: any) {
+    logError(`Error during deactivation: ${error.message || error}`);
     return;
   }
 };
