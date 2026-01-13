@@ -2,7 +2,7 @@ import { AuthorizationManagementClient } from "@azure/arm-authorization";
 import { SubscriptionClient } from "@azure/arm-resources-subscriptions";
 import { AzureCliCredential } from "@azure/identity";
 import { v4 as uuidv4 } from "uuid";
-import { failSpinner, formatStatus, logBlank, logError, logSuccess, logWarning, startSpinner, succeedSpinner, warnSpinner } from "./ui";
+import { failSpinner, formatStatus, logBlank, logDim, logError, logSuccess, logWarning, startSpinner, succeedSpinner, warnSpinner } from "./ui";
 
 export interface AzureSubscription {
   subscriptionId: string;
@@ -154,7 +154,11 @@ export const listActiveAzureRoles = async (
   }
 };
 
-export const activateAzureRole = async (credential: AzureCliCredential, request: AzureActivationRequest, subscriptionId: string): Promise<void> => {
+export const activateAzureRole = async (
+  credential: AzureCliCredential,
+  request: AzureActivationRequest,
+  subscriptionId: string
+): Promise<{ status?: string }> => {
   const client = new AuthorizationManagementClient(credential, subscriptionId);
   const requestName = uuidv4();
   const now = new Date();
@@ -188,7 +192,7 @@ export const activateAzureRole = async (credential: AzureCliCredential, request:
     logBlank();
 
     if (response.status) {
-      console.log(`   Status: ${formatStatus(response.status)}`);
+      logDim(`   Status: ${formatStatus(response.status)}`);
     }
 
     if (response.status === "Approved" || response.status === "Provisioned") {
@@ -198,6 +202,8 @@ export const activateAzureRole = async (credential: AzureCliCredential, request:
     } else if (response.status === "PendingApproval") {
       logWarning(`Role activation for "${request.roleName}" is pending approval`);
     }
+
+    return { status: response.status };
   } catch (error) {
     failSpinner(`Failed to activate role "${request.roleName}"`);
     throw error;

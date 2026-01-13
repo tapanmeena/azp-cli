@@ -1,6 +1,20 @@
 import chalk from "chalk";
 import ora, { type Ora } from "ora";
 
+type UiOptions = {
+  quiet: boolean;
+};
+
+let uiOptions: UiOptions = {
+  quiet: false,
+};
+
+export const configureUi = (options: Partial<UiOptions>): void => {
+  uiOptions = { ...uiOptions, ...options };
+};
+
+export const isQuietMode = (): boolean => uiOptions.quiet;
+
 // ===============================
 // Spinner Management
 // ===============================
@@ -12,6 +26,10 @@ let currentSpinner: Ora | null = null;
  * If a spinner is already running, it will be stopped first.
  */
 export const startSpinner = (text: string): Ora => {
+  if (isQuietMode()) {
+    currentSpinner = ora({ isEnabled: false, text: "" });
+    return currentSpinner;
+  }
   if (currentSpinner) {
     currentSpinner.stop();
   }
@@ -26,6 +44,7 @@ export const startSpinner = (text: string): Ora => {
  * Updates the text of the current spinner.
  */
 export const updateSpinner = (text: string): void => {
+  if (isQuietMode()) return;
   if (currentSpinner) {
     currentSpinner.text = chalk.cyan(text);
   }
@@ -35,6 +54,10 @@ export const updateSpinner = (text: string): void => {
  * Stops the current spinner with a success message.
  */
 export const succeedSpinner = (text?: string): void => {
+  if (isQuietMode()) {
+    currentSpinner = null;
+    return;
+  }
   if (currentSpinner) {
     if (text) {
       currentSpinner.succeed(chalk.green(text));
@@ -49,6 +72,10 @@ export const succeedSpinner = (text?: string): void => {
  * Stops the current spinner with a failure message.
  */
 export const failSpinner = (text?: string): void => {
+  if (isQuietMode()) {
+    currentSpinner = null;
+    return;
+  }
   if (currentSpinner) {
     if (text) {
       currentSpinner.fail(chalk.red(text));
@@ -63,6 +90,10 @@ export const failSpinner = (text?: string): void => {
  * Stops the current spinner with a warning message.
  */
 export const warnSpinner = (text?: string): void => {
+  if (isQuietMode()) {
+    currentSpinner = null;
+    return;
+  }
   if (currentSpinner) {
     if (text) {
       currentSpinner.warn(chalk.yellow(text));
@@ -77,6 +108,10 @@ export const warnSpinner = (text?: string): void => {
  * Stops the current spinner with an info message.
  */
 export const infoSpinner = (text?: string): void => {
+  if (isQuietMode()) {
+    currentSpinner = null;
+    return;
+  }
   if (currentSpinner) {
     if (text) {
       currentSpinner.info(chalk.blue(text));
@@ -91,6 +126,10 @@ export const infoSpinner = (text?: string): void => {
  * Stops the current spinner without persisting any text.
  */
 export const stopSpinner = (): void => {
+  if (isQuietMode()) {
+    currentSpinner = null;
+    return;
+  }
   if (currentSpinner) {
     currentSpinner.stop();
     currentSpinner = null;
@@ -105,6 +144,7 @@ export const stopSpinner = (): void => {
  * Logs an info message with a blue info icon.
  */
 export const logInfo = (message: string): void => {
+  if (isQuietMode()) return;
   console.log(chalk.blue("ℹ"), chalk.blue(message));
 };
 
@@ -112,6 +152,7 @@ export const logInfo = (message: string): void => {
  * Logs a success message with a green checkmark.
  */
 export const logSuccess = (message: string): void => {
+  if (isQuietMode()) return;
   console.log(chalk.green("✔"), chalk.green(message));
 };
 
@@ -119,6 +160,7 @@ export const logSuccess = (message: string): void => {
  * Logs an error message with a red cross.
  */
 export const logError = (message: string): void => {
+  if (isQuietMode()) return;
   console.log(chalk.red("✖"), chalk.red(message));
 };
 
@@ -126,6 +168,7 @@ export const logError = (message: string): void => {
  * Logs a warning message with a yellow warning icon.
  */
 export const logWarning = (message: string): void => {
+  if (isQuietMode()) return;
   console.log(chalk.yellow("⚠"), chalk.yellow(message));
 };
 
@@ -133,6 +176,7 @@ export const logWarning = (message: string): void => {
  * Logs a dimmed/secondary message.
  */
 export const logDim = (message: string): void => {
+  if (isQuietMode()) return;
   console.log(chalk.dim(message));
 };
 
@@ -140,6 +184,7 @@ export const logDim = (message: string): void => {
  * Logs a blank line.
  */
 export const logBlank = (): void => {
+  if (isQuietMode()) return;
   console.log();
 };
 
@@ -151,6 +196,7 @@ export const logBlank = (): void => {
  * Displays the application header/banner.
  */
 export const showHeader = (): void => {
+  if (isQuietMode()) return;
   logBlank();
   console.log(chalk.cyan.bold("╔════════════════════════════════════════════════════╗"));
   console.log(chalk.cyan.bold("║") + chalk.white.bold("     Azure PIM CLI - Role Activation Manager        ") + chalk.cyan.bold("║"));
@@ -162,6 +208,7 @@ export const showHeader = (): void => {
  * Displays a section divider.
  */
 export const showDivider = (): void => {
+  if (isQuietMode()) return;
   console.log(chalk.dim("─".repeat(54)));
 };
 
@@ -213,6 +260,7 @@ export const formatStatus = (status: string): string => {
  * Displays a summary box for activation/deactivation results.
  */
 export const showSummary = (title: string, items: { label: string; value: string }[]): void => {
+  if (isQuietMode()) return;
   const boxWidth = 54;
   const titleWidth = Math.max(0, boxWidth - 4 - title.length);
   logBlank();

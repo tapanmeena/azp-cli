@@ -21,5 +21,6 @@
     "**/node_modules": true,
     "**/dist": true,
     "**/pnpm-lock.yaml": true
-  }
+  },
+  "cSpell.words": ["AADSTS"]
 }

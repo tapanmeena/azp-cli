@@ -78,6 +78,39 @@ node dist/index.js
 | `deactivate` | `d` | Deactivate a role in Azure PIM |
 | `help` | - | Display help information |
 
+### One-command (non-interactive) activation
+
+Use flags to activate PIM roles directly without going through the main menu.
+
+```bash
+# Activate a single role by name (non-interactive)
+azp activate --no-interactive --yes \
+   --subscription-id <SUBSCRIPTION_GUID> \
+   --role-name "Owner" \
+   --duration-hours 2 \
+   --justification "Break-glass for incident" \
+   --output json
+
+# Activate multiple roles (repeat --role-name)
+azp activate --no-interactive --yes \
+   --subscription-id <SUBSCRIPTION_GUID> \
+   --role-name "Contributor" \
+   --role-name "User Access Administrator"
+
+# If a role name matches multiple eligible roles (different scopes),
+# --no-interactive will error unless you explicitly allow activating all matches
+azp activate --no-interactive --yes \
+   --subscription-id <SUBSCRIPTION_GUID> \
+   --role-name "Contributor" \
+   --allow-multiple
+
+# Preview what would happen without submitting requests
+azp activate --no-interactive --dry-run \
+   --subscription-id <SUBSCRIPTION_GUID> \
+   --role-name "Contributor" \
+   --output json
+```
+
 ### Example Session
 
 ```

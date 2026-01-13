@@ -23,6 +23,544 @@ import {
   showSummary,
 } from "./ui";
 
+export type ActivateOnceOptions = {
+  subscriptionId: string;
+  roleNames: string[];
+  durationHours?: number;
+  justification?: string;
+  dryRun?: boolean;
+  noInteractive?: boolean;
+  yes?: boolean;
+  allowMultiple?: boolean;
+};
+
+export type ActivateOnceResult = {
+  subscriptionId: string;
+  subscriptionName: string;
+  requestedRoleNames: string[];
+  resolvedTargets: Array<{
+    eligibilityId: string;
+    roleName: string;
+    scope: string;
+    scopeDisplayName: string;
+    roleDefinitionId: string;
+  }>;
+  durationHours: number;
+  justification: string;
+  dryRun: boolean;
+  results?: Array<{
+    eligibilityId: string;
+    roleName: string;
+    scopeDisplayName: string;
+    status?: string;
+    success: boolean;
+    error?: string;
+  }>;
+};
+
+export type DeactivateOnceOptions = {
+  subscriptionId?: string;
+  roleNames: string[];
+  justification?: string;
+  dryRun?: boolean;
+  noInteractive?: boolean;
+  yes?: boolean;
+  allowMultiple?: boolean;
+};
+
+export type DeactivateOnceResult = {
+  requestedRoleNames: string[];
+  resolvedTargets: Array<{
+    assignmentId: string;
+    roleName: string;
+    scope: string;
+    scopeDisplayName: string;
+    subscriptionId: string;
+    subscriptionName: string;
+  }>;
+  justification: string;
+  dryRun: boolean;
+  results?: Array<{
+    assignmentId: string;
+    roleName: string;
+    scopeDisplayName: string;
+    subscriptionName: string;
+    success: boolean;
+    error?: string;
+  }>;
+};
+
+const normalizeRoleName = (value: string): string => value.trim().toLowerCase();
+
+const validateDurationHours = (value: number): void => {
+  if (!Number.isFinite(value) || value < 1 || value > 8) {
+    throw new Error("Invalid --duration-hours. Expected a number between 1 and 8.");
+  }
+};
+
+export const activateOnce = async (authContext: AuthContext, options: ActivateOnceOptions): Promise<ActivateOnceResult> => {
+  const durationHours = options.durationHours ?? 8;
+  validateDurationHours(durationHours);
+
+  const justification = options.justification ?? "Activated via azp-cli";
+
+  if (!options.subscriptionId?.trim()) {
+    throw new Error("Missing required flag: --subscription-id");
+  }
+
+  const requestedRoleNames = (options.roleNames || []).map((n) => n.trim()).filter(Boolean);
+  if (requestedRoleNames.length === 0) {
+    throw new Error("Missing required flag: --role-name (can be repeated)");
+  }
+
+  if (options.noInteractive && !options.yes && !options.dryRun) {
+    throw new Error("--no-interactive requires --yes (or use --dry-run)");
+  }
+
+  logBlank();
+  logInfo("Resolving subscription and eligible roles...");
+
+  const subscriptions = await fetchSubscriptions(authContext.credential);
+  const selectedSubscription = subscriptions.find((s) => s.subscriptionId === options.subscriptionId);
+  if (!selectedSubscription) {
+    throw new Error(`Subscription not found for --subscription-id=${options.subscriptionId}`);
+  }
+
+  const eligibleRoles = await fetchEligibleRolesForSubscription(
+    authContext.credential,
+    selectedSubscription.subscriptionId,
+    selectedSubscription.displayName,
+    authContext.userId
+  );
+
+  const eligibleByName = new Map<string, typeof eligibleRoles>();
+  for (const role of eligibleRoles) {
+    const key = normalizeRoleName(role.roleName);
+    const list = eligibleByName.get(key) ?? [];
+    list.push(role);
+    eligibleByName.set(key, list);
+  }
+
+  const resolvedTargets: ActivateOnceResult["resolvedTargets"] = [];
+
+  for (const name of requestedRoleNames) {
+    const matches = eligibleByName.get(normalizeRoleName(name)) ?? [];
+
+    if (matches.length === 0) {
+      throw new Error(`No eligible roles found matching --role-name="${name}" in subscription "${selectedSubscription.displayName}"`);
+    }
+
+    if (matches.length > 1 && !options.allowMultiple) {
+      if (options.noInteractive) {
+        throw new Error(
+          `Ambiguous --role-name="${name}" matched ${matches.length} eligible roles. Use --allow-multiple to activate all matches, or run without --no-interactive to select interactively.`
+        );
+      }
+
+      logBlank();
+      logWarning(`Multiple eligible roles match "${name}". Please select which ones to activate:`);
+      const { selectedIds } = await inquirer.prompt<{ selectedIds: string[] }>([
+        {
+          type: "checkbox",
+          name: "selectedIds",
+          message: chalk.cyan(`Select matches for "${name}":`),
+          choices: matches.map((r) => ({ name: formatRole(r.roleName, r.scopeDisplayName), value: r.id })),
+          validate: (answer) => {
+            if (!Array.isArray(answer) || answer.length < 1) {
+              return chalk.red("You must choose at least one role.");
+            }
+            return true;
+          },
+          pageSize: 15,
+        },
+      ]);
+      for (const id of selectedIds) {
+        const role = matches.find((m) => m.id === id);
+        if (role) {
+          resolvedTargets.push({
+            eligibilityId: role.id,
+            roleName: role.roleName,
+            scope: role.scope,
+            scopeDisplayName: role.scopeDisplayName,
+            roleDefinitionId: role.roleDefinitionId,
+          });
+        }
+      }
+      continue;
+    }
+
+    for (const role of matches) {
+      resolvedTargets.push({
+        eligibilityId: role.id,
+        roleName: role.roleName,
+        scope: role.scope,
+        scopeDisplayName: role.scopeDisplayName,
+        roleDefinitionId: role.roleDefinitionId,
+      });
+    }
+  }
+
+  const uniqueTargets = new Map<string, ActivateOnceResult["resolvedTargets"][number]>();
+  for (const target of resolvedTargets) {
+    uniqueTargets.set(target.eligibilityId, target);
+  }
+
+  const targets = Array.from(uniqueTargets.values());
+  if (targets.length === 0) {
+    throw new Error("No eligible roles selected to activate.");
+  }
+
+  showSummary("Activation Summary", [
+    { label: "Subscription", value: selectedSubscription.displayName },
+    { label: "Role(s)", value: targets.map((t) => `${t.roleName} @ ${t.scopeDisplayName}`).join(", ") },
+    { label: "Duration", value: `${durationHours} hour(s)` },
+    { label: "Justification", value: justification },
+    { label: "Dry-run", value: options.dryRun ? "Yes" : "No" },
+  ]);
+
+  if (options.dryRun) {
+    logSuccess("Dry-run complete. No activation requests were submitted.");
+    return {
+      subscriptionId: selectedSubscription.subscriptionId,
+      subscriptionName: selectedSubscription.displayName,
+      requestedRoleNames,
+      resolvedTargets: targets,
+      durationHours,
+      justification,
+      dryRun: true,
+    };
+  }
+
+  if (!options.yes) {
+    const { confirmActivation } = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "confirmActivation",
+        message: chalk.yellow(`Confirm activation of ${targets.length} role(s)?`),
+        default: true,
+      },
+    ]);
+
+    if (!confirmActivation) {
+      logWarning("Activation cancelled by user.");
+      return {
+        subscriptionId: selectedSubscription.subscriptionId,
+        subscriptionName: selectedSubscription.displayName,
+        requestedRoleNames,
+        resolvedTargets: targets,
+        durationHours,
+        justification,
+        dryRun: false,
+        results: targets.map((t) => ({
+          eligibilityId: t.eligibilityId,
+          roleName: t.roleName,
+          scopeDisplayName: t.scopeDisplayName,
+          success: false,
+          error: "Cancelled",
+        })),
+      };
+    }
+  }
+
+  logBlank();
+  logInfo(`Activating ${targets.length} role(s)...`);
+  logBlank();
+
+  const results: NonNullable<ActivateOnceResult["results"]> = [];
+  for (const target of targets) {
+    try {
+      const response = await activateAzureRole(
+        authContext.credential,
+        {
+          principalId: authContext.userId,
+          roleDefinitionId: target.roleDefinitionId,
+          roleName: `${target.roleName} @ ${target.scopeDisplayName}`,
+          roleEligibilityScheduleId: target.eligibilityId,
+          scope: target.scope,
+          durationHours,
+          justification,
+        },
+        selectedSubscription.subscriptionId
+      );
+      results.push({
+        eligibilityId: target.eligibilityId,
+        roleName: target.roleName,
+        scopeDisplayName: target.scopeDisplayName,
+        status: response.status,
+        success: true,
+      });
+    } catch (error: any) {
+      results.push({
+        eligibilityId: target.eligibilityId,
+        roleName: target.roleName,
+        scopeDisplayName: target.scopeDisplayName,
+        success: false,
+        error: error?.message ?? String(error),
+      });
+    }
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.length - successCount;
+
+  logBlank();
+  showDivider();
+  if (successCount > 0 && failCount === 0) {
+    logSuccess(`All ${successCount} role(s) activated successfully!`);
+  } else if (successCount > 0 && failCount > 0) {
+    logWarning(`${successCount} role(s) activated, ${failCount} failed.`);
+  } else {
+    logError(`All ${failCount} role activation(s) failed.`);
+  }
+
+  return {
+    subscriptionId: selectedSubscription.subscriptionId,
+    subscriptionName: selectedSubscription.displayName,
+    requestedRoleNames,
+    resolvedTargets: targets,
+    durationHours,
+    justification,
+    dryRun: false,
+    results,
+  };
+};
+
+export const deactivateOnce = async (authContext: AuthContext, options: DeactivateOnceOptions): Promise<DeactivateOnceResult> => {
+  const justification = options.justification ?? "Deactivated via azp-cli";
+
+  const requestedRoleNames = (options.roleNames || []).map((n) => n.trim()).filter(Boolean);
+  if (requestedRoleNames.length === 0) {
+    throw new Error("Missing required flag: --role-name (can be repeated)");
+  }
+
+  if (options.noInteractive && !options.yes && !options.dryRun) {
+    throw new Error("--no-interactive requires --yes (or use --dry-run)");
+  }
+
+  logBlank();
+  logInfo("Resolving subscriptions and active roles...");
+
+  const subscriptions = await fetchSubscriptions(authContext.credential);
+  if (subscriptions.length === 0) {
+    throw new Error("No subscriptions found.");
+  }
+
+  let targetSubscriptions = subscriptions;
+  if (options.subscriptionId?.trim()) {
+    const selectedSubscription = subscriptions.find((s) => s.subscriptionId === options.subscriptionId);
+    if (!selectedSubscription) {
+      throw new Error(`Subscription not found for --subscription-id=${options.subscriptionId}`);
+    }
+    targetSubscriptions = [selectedSubscription];
+  }
+
+  let allActiveRoles: ActiveAzureRole[] = [];
+  for (const sub of targetSubscriptions) {
+    const roles = await listActiveAzureRoles(authContext.credential, sub.subscriptionId, sub.displayName, authContext.userId);
+    allActiveRoles = allActiveRoles.concat(roles);
+  }
+
+  if (allActiveRoles.length === 0) {
+    throw new Error("No active roles found for deactivation.");
+  }
+
+  const activeByName = new Map<string, typeof allActiveRoles>();
+  for (const role of allActiveRoles) {
+    const key = normalizeRoleName(role.roleName);
+    const list = activeByName.get(key) ?? [];
+    list.push(role);
+    activeByName.set(key, list);
+  }
+
+  const resolvedTargets: DeactivateOnceResult["resolvedTargets"] = [];
+
+  for (const name of requestedRoleNames) {
+    const matches = activeByName.get(normalizeRoleName(name)) ?? [];
+
+    if (matches.length === 0) {
+      throw new Error(`No active roles found matching --role-name="${name}"`);
+    }
+
+    if (matches.length > 1 && !options.allowMultiple) {
+      if (options.noInteractive) {
+        throw new Error(
+          `Ambiguous --role-name="${name}" matched ${matches.length} active roles. Use --allow-multiple to deactivate all matches, or run without --no-interactive to select interactively.`
+        );
+      }
+
+      logBlank();
+      logWarning(`Multiple active roles match "${name}". Please select which ones to deactivate:`);
+      const { selectedIds } = await inquirer.prompt<{ selectedIds: string[] }>([
+        {
+          type: "checkbox",
+          name: "selectedIds",
+          message: chalk.cyan(`Select matches for "${name}":`),
+          choices: matches.map((r) => ({
+            name: formatActiveRole(r.roleName, r.scopeDisplayName, r.subscriptionName, r.startDateTime),
+            value: r.id,
+          })),
+          validate: (answer) => {
+            if (!Array.isArray(answer) || answer.length < 1) {
+              return chalk.red("You must choose at least one role.");
+            }
+            return true;
+          },
+          pageSize: 15,
+        },
+      ]);
+      for (const id of selectedIds) {
+        const role = matches.find((m) => m.id === id);
+        if (role) {
+          resolvedTargets.push({
+            assignmentId: role.id,
+            roleName: role.roleName,
+            scope: role.scope,
+            scopeDisplayName: role.scopeDisplayName,
+            subscriptionId: role.subscriptionId,
+            subscriptionName: role.subscriptionName,
+          });
+        }
+      }
+      continue;
+    }
+
+    for (const role of matches) {
+      resolvedTargets.push({
+        assignmentId: role.id,
+        roleName: role.roleName,
+        scope: role.scope,
+        scopeDisplayName: role.scopeDisplayName,
+        subscriptionId: role.subscriptionId,
+        subscriptionName: role.subscriptionName,
+      });
+    }
+  }
+
+  const uniqueTargets = new Map<string, DeactivateOnceResult["resolvedTargets"][number]>();
+  for (const target of resolvedTargets) {
+    uniqueTargets.set(target.assignmentId, target);
+  }
+
+  const targets = Array.from(uniqueTargets.values());
+  if (targets.length === 0) {
+    throw new Error("No active roles selected to deactivate.");
+  }
+
+  showSummary("Deactivation Summary", [
+    { label: "Role(s)", value: targets.map((t) => `${t.roleName} @ ${t.scopeDisplayName} (${t.subscriptionName})`).join(", ") },
+    { label: "Justification", value: justification },
+    { label: "Dry-run", value: options.dryRun ? "Yes" : "No" },
+  ]);
+
+  if (options.dryRun) {
+    logSuccess("Dry-run complete. No deactivation requests were submitted.");
+    return {
+      requestedRoleNames,
+      resolvedTargets: targets,
+      justification,
+      dryRun: true,
+    };
+  }
+
+  if (!options.yes) {
+    const { confirmDeactivation } = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "confirmDeactivation",
+        message: chalk.yellow(`Confirm deactivation of ${targets.length} role(s)?`),
+        default: true,
+      },
+    ]);
+
+    if (!confirmDeactivation) {
+      logWarning("Deactivation cancelled by user.");
+      return {
+        requestedRoleNames,
+        resolvedTargets: targets,
+        justification,
+        dryRun: false,
+        results: targets.map((t) => ({
+          assignmentId: t.assignmentId,
+          roleName: t.roleName,
+          scopeDisplayName: t.scopeDisplayName,
+          subscriptionName: t.subscriptionName,
+          success: false,
+          error: "Cancelled",
+        })),
+      };
+    }
+  }
+
+  logBlank();
+  logInfo(`Deactivating ${targets.length} role(s)...`);
+  logBlank();
+
+  const results: NonNullable<DeactivateOnceResult["results"]> = [];
+  for (const target of targets) {
+    const role = allActiveRoles.find((r) => r.id === target.assignmentId);
+    if (!role) {
+      results.push({
+        assignmentId: target.assignmentId,
+        roleName: target.roleName,
+        scopeDisplayName: target.scopeDisplayName,
+        subscriptionName: target.subscriptionName,
+        success: false,
+        error: "Role not found in active roles list",
+      });
+      continue;
+    }
+
+    try {
+      await deactivateAzureRole(
+        authContext.credential,
+        role.scope,
+        role.linkedRoleEligibilityScheduleId,
+        role.subscriptionId,
+        authContext.userId,
+        role.roleDefinitionId,
+        `${role.roleName} @ ${role.scopeDisplayName}`
+      );
+      results.push({
+        assignmentId: target.assignmentId,
+        roleName: target.roleName,
+        scopeDisplayName: target.scopeDisplayName,
+        subscriptionName: target.subscriptionName,
+        success: true,
+      });
+    } catch (error: any) {
+      results.push({
+        assignmentId: target.assignmentId,
+        roleName: target.roleName,
+        scopeDisplayName: target.scopeDisplayName,
+        subscriptionName: target.subscriptionName,
+        success: false,
+        error: error?.message ?? String(error),
+      });
+    }
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.length - successCount;
+
+  logBlank();
+  showDivider();
+  if (successCount > 0 && failCount === 0) {
+    logSuccess(`All ${successCount} role(s) deactivated successfully!`);
+  } else if (successCount > 0 && failCount > 0) {
+    logWarning(`${successCount} role(s) deactivated, ${failCount} failed.`);
+  } else {
+    logError(`All ${failCount} role deactivation(s) failed.`);
+  }
+
+  return {
+    requestedRoleNames,
+    resolvedTargets: targets,
+    justification,
+    dryRun: false,
+    results,
+  };
+};
+
 const promptBackToMainMenuOrExit = async (message: string): Promise<void> => {
   logBlank();
   const { next } = await inquirer.prompt<{ next: "back" | "exit" }>([
