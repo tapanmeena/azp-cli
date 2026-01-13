@@ -1,6 +1,6 @@
 {
   "name": "azp-cli",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Terminal app to manage Azure PIM role activations",
   "main": "dist/index.js",
   "bin": {
