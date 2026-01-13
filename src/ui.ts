@@ -197,10 +197,37 @@ export const logBlank = (): void => {
  */
 export const showHeader = (): void => {
   if (isQuietMode()) return;
+
+  const margin = "  ";
+  const innerWidth = 53;
+
+  const stripAnsi = (value: string): string => value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+  const visibleWidth = (value: string): number => Array.from(stripAnsi(value)).length;
+  const padCenter = (value: string, numberOfSpecialChars: number): string => {
+    const width = visibleWidth(value);
+    if (width >= innerWidth) return value;
+    const left = Math.floor((innerWidth - width) / 2);
+    const right = innerWidth - width - left - numberOfSpecialChars;
+    return " ".repeat(left) + value + " ".repeat(right);
+  };
+  const printLine = (content = "", numberOfSpecialChars = 0): void => {
+    console.log(chalk.cyan(`${margin}│`) + padCenter(content, numberOfSpecialChars) + chalk.cyan("│"));
+  };
+
   logBlank();
-  console.log(chalk.cyan.bold("╔════════════════════════════════════════════════════╗"));
-  console.log(chalk.cyan.bold("║") + chalk.white.bold("     Azure PIM CLI - Role Activation Manager        ") + chalk.cyan.bold("║"));
-  console.log(chalk.cyan.bold("╚════════════════════════════════════════════════════╝"));
+
+  const top = `${margin}╭${"─".repeat(innerWidth)}╮`;
+  const bottom = `${margin}╰${"─".repeat(innerWidth)}╯`;
+  const title = chalk.blueBright("⚡ ") + chalk.bold.white("AZP-CLI") + chalk.dim(" • Azure PIM Manager") + chalk.blueBright(" ⚡");
+  const tagline = chalk.dim("Activate & manage your Azure roles");
+
+  console.log(chalk.cyan(top));
+  printLine();
+  printLine(title, 2);
+  printLine();
+  printLine(tagline);
+  printLine();
+  console.log(chalk.cyan(bottom));
   logBlank();
 };
 
