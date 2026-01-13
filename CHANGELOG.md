@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/tapanmeena/azp-cli/compare/v1.0.0...v1.1.0) (2026-01-13)
+
+
+### Features
+
+* add update command to check for newer azp-cli versions ([be50502](https://github.com/tapanmeena/azp-cli/commit/be5050207b90335aace73927ccd9cc47e1c7f9ae))
+
 ## [1.0.0](https://github.com/tapanmeena/azp-cli/compare/v0.0.4...v1.0.0) (2026-01-13)
 
 
