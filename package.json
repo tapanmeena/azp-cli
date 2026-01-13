@@ -1,6 +1,6 @@
 {
   "name": "azp-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Terminal app to manage Azure PIM role activations",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node -r tsconfig-paths/register src/index.ts",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "release": "standard-version",
+    "release:dry": "standard-version --dry-run"
   },
   "keywords": [
     "azure",
@@ -41,6 +43,7 @@
     "@types/inquirer": "^9.0.9",
     "@types/node": "^25.0.6",
     "esbuild": "^0.27.2",
+    "standard-version": "^9.5.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"

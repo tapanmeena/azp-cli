@@ -72,11 +72,11 @@ node dist/index.js
 
 ### Commands
 
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `activate` | `a` | Activate a role in Azure PIM (default) |
-| `deactivate` | `d` | Deactivate a role in Azure PIM |
-| `help` | - | Display help information |
+| Command      | Alias | Description                            |
+| ------------ | ----- | -------------------------------------- |
+| `activate`   | `a`   | Activate a role in Azure PIM (default) |
+| `deactivate` | `d`   | Deactivate a role in Azure PIM         |
+| `help`       | -     | Display help information               |
 
 ### One-command (non-interactive) activation
 
@@ -165,6 +165,50 @@ pnpm start
 pnpm lint
 ```
 
+## Changelog & releases
+
+This repo uses [Keep a Changelog](https://keepachangelog.com/) format in [CHANGELOG.md](CHANGELOG.md).
+
+### Recommended commit messages
+
+For best results, use [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat: ...` (new feature) → minor bump
+- `fix: ...` (bug fix) → patch bump
+- `chore: ...`, `docs: ...`, `refactor: ...` (no bump unless breaking)
+
+### Cutting a release
+
+1. Make sure `CHANGELOG.md` has up-to-date entries under **Unreleased**.
+
+2. Run one of the following:
+
+```bash
+# Automatically determines next version from commits, updates CHANGELOG.md,
+# bumps package.json, and creates a git tag.
+pnpm release
+
+# Preview what would change
+pnpm release:dry
+
+# Force a specific bump if needed
+pnpm release -- --release-as patch
+pnpm release -- --release-as minor
+pnpm release -- --release-as major
+```
+
+3. Push commits + tags:
+
+```bash
+git push --follow-tags
+```
+
+4. Publish to npm (if desired):
+
+```bash
+pnpm publish
+```
+
 ### Project Structure
 
 ```
@@ -194,6 +238,7 @@ azp-cli/
 ### "Azure CLI not found" Error
 
 Ensure Azure CLI is installed and accessible in your PATH:
+
 ```bash
 az --version
 ```
@@ -201,11 +246,13 @@ az --version
 ### Authentication Errors
 
 1. Make sure you're logged in to Azure CLI:
+
    ```bash
    az login
    ```
 
 2. Verify your account has PIM-eligible roles:
+
    ```bash
    az account show
    ```
