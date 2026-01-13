@@ -76,8 +76,31 @@ node dist/index.js
 | ------------ | ----- | -------------------------------------- |
 | `activate`   | `a`   | Activate a role in Azure PIM (default) |
 | `deactivate` | `d`   | Deactivate a role in Azure PIM         |
+| `update`     | -     | Check for a newer version              |
 | `preset`     | -     | Manage reusable presets                |
 | `help`       | -     | Display help information               |
+
+### Updates
+
+You can check if a newer version is available:
+
+```bash
+azp update
+# alias
+azp upgrade
+```
+
+Notes:
+
+- `azp update` exits with code `0` when up-to-date, `2` when an update is available, and `1` on error.
+- `--output json` returns a structured response suitable for scripts.
+- By default, `azp activate` and `azp deactivate` will also show a short “update available” hint (text mode only) at most once per day.
+- Disable update checks via `AZP_NO_UPDATE_NOTIFIER=1` (or `AZP_DISABLE_UPDATE_CHECK=1`).
+
+The update-check cache is stored alongside presets in your config directory:
+
+- macOS/Linux: `~/.config/azp-cli/update-check.json` (or `$XDG_CONFIG_HOME/azp-cli/update-check.json`)
+- Windows: `%APPDATA%\azp-cli\update-check.json`
 
 ### One-command (non-interactive) activation
 

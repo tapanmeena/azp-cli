@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 import inquirer from "inquirer";
-import { version } from "../package.json";
+import { name as npmPackageName, version } from "../package.json";
 import { authenticate } from "./auth";
 import { activateOnce, deactivateOnce, showMainMenu } from "./cli";
 import { runPresetAddWizard, runPresetEditWizard } from "./presets-cli";
@@ -20,6 +20,7 @@ import {
   upsertPreset,
 } from "./presets";
 import { configureUi, logBlank, logDim, logError, logInfo, logSuccess, logWarning, showHeader } from "./ui";
+import { checkForUpdate } from "./update-check";
 
 type OutputFormat = "text" | "json";
 
@@ -55,6 +56,31 @@ type PresetCommandOptions = {
   quiet?: boolean;
   fromAzure?: boolean;
   yes?: boolean;
+};
+
+type UpdateCommandOptions = {
+  output?: OutputFormat;
+  quiet?: boolean;
+  checkOnly?: boolean;
+};
+
+const maybeNotifyUpdate = async (output: OutputFormat, quiet: boolean): Promise<void> => {
+  if (quiet || output !== "text") return;
+  if (!process.stdout.isTTY) return;
+  if (process.env.CI) return;
+
+  const result = await checkForUpdate({
+    packageName: npmPackageName,
+    currentVersion: version,
+    mode: "auto",
+  });
+
+  if (!result.ok || !result.updateAvailable || !result.latestVersion) return;
+
+  logWarning(`Update available: ${result.currentVersion} → ${result.latestVersion}`);
+  logDim(`Update: npm install -g ${npmPackageName}@latest`);
+  logDim(`        pnpm add -g ${npmPackageName}@latest`);
+  logBlank();
 };
 
 const getOptionValueSource = (command: Command, optionName: string): string | undefined => {
@@ -106,6 +132,8 @@ program
 
       // Show header (text mode only)
       showHeader();
+
+      await maybeNotifyUpdate(output, quiet);
 
       const explicitPresetName = getOptionValueSource(command, "preset") === "cli" ? cmd.preset : undefined;
 
@@ -231,6 +259,8 @@ program
       // Show header (text mode only)
       showHeader();
 
+      await maybeNotifyUpdate(output, quiet);
+
       const explicitPresetName = getOptionValueSource(command, "preset") === "cli" ? cmd.preset : undefined;
 
       const requestedRoleNames = cmd.roleName ?? [];
@@ -313,6 +343,83 @@ program
         logDim("Tip: Make sure Azure CLI is installed and you are logged in with 'az login'.");
       }
 
+      logBlank();
+      process.exit(1);
+    }
+  });
+
+program
+  .command("update")
+  .description("Check if a newer azp-cli version is available")
+  .alias("upgrade")
+  .option("--check-only", "Only check and print status (no upgrade instructions)")
+  .option("--output <text|json>", "Output format", "text")
+  .option("--quiet", "Suppress non-essential output (recommended with --output json)")
+  .action(async (cmd: UpdateCommandOptions) => {
+    try {
+      const output = (cmd.output ?? "text") as OutputFormat;
+      const quiet = Boolean(cmd.quiet || output === "json");
+      configureUi({ quiet });
+
+      showHeader();
+
+      const result = await checkForUpdate({
+        packageName: npmPackageName,
+        currentVersion: version,
+        mode: "force",
+      });
+
+      const upgradeCommands = {
+        npm: `npm install -g ${npmPackageName}@latest`,
+        pnpm: `pnpm add -g ${npmPackageName}@latest`,
+      };
+
+      if (output === "json") {
+        process.stdout.write(
+          `${JSON.stringify(
+            {
+              ...result,
+              upgradeCommands: result.updateAvailable ? upgradeCommands : undefined,
+            },
+            null,
+            2
+          )}\n`
+        );
+        process.exit(result.ok ? (result.updateAvailable ? 2 : 0) : 1);
+      }
+
+      if (!result.ok) {
+        logWarning("Could not check for updates.");
+        if (result.error) logDim(result.error);
+        if (!cmd.checkOnly) {
+          logBlank();
+          logDim(`Upgrade (when ready): ${upgradeCommands.npm}`);
+          logDim(`Or:                ${upgradeCommands.pnpm}`);
+        }
+        process.exit(1);
+      }
+
+      if (result.updateAvailable && result.latestVersion) {
+        logWarning(`Update available: ${result.currentVersion} → ${result.latestVersion}`);
+        if (!cmd.checkOnly) {
+          logBlank();
+          logDim(`Upgrade: ${upgradeCommands.npm}`);
+          logDim(`Or:      ${upgradeCommands.pnpm}`);
+        }
+        process.exit(2);
+      }
+
+      logSuccess(`You're up to date (${result.currentVersion}).`);
+      process.exit(0);
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const output = (cmd.output ?? "text") as OutputFormat;
+      if (output === "json") {
+        process.stdout.write(`${JSON.stringify({ ok: false, error: errorMessage }, null, 2)}\n`);
+        process.exit(1);
+      }
+      logBlank();
+      logError(`An error occurred: ${errorMessage}`);
       logBlank();
       process.exit(1);
     }
