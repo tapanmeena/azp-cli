@@ -223,7 +223,7 @@ export const showHeader = (): void => {
 
   console.log(chalk.cyan(top));
   printLine();
-  printLine(title, 2);
+  printLine(title, 4);
   printLine();
   printLine(tagline);
   printLine();

@@ -348,9 +348,9 @@ program
   });
 
 program
-  .command("update")
+  .command("check-update")
   .description("Check if a newer azp-cli version is available")
-  .alias("upgrade")
+  .alias("update")
   .option("--check-only", "Only check and print status (no upgrade instructions)")
   .option("--output <text|json>", "Output format", "text")
   .option("--quiet", "Suppress non-essential output (recommended with --output json)")
