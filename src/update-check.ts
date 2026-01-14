@@ -143,6 +143,8 @@ export const checkForUpdate = async (options: {
   const state = await readState(stateFilePath);
   if (mode === "auto" && state) {
     const lastCheckedAtMs = Date.parse(state.lastCheckedAt);
+
+    // Use cached result if within interval i.e. 24 hours
     if (Number.isFinite(lastCheckedAtMs) && now.getTime() - lastCheckedAtMs < intervalMs) {
       const updateAvailable = isUpdateAvailable(currentVersion, state.latestVersion);
       return {
