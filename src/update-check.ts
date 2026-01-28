@@ -53,7 +53,7 @@ const isUpdateAvailable = (currentVersion: string, latestVersion: string): boole
 };
 
 const isDisabledByEnv = (): boolean => {
-  const keys = ["AZP_NO_UPDATE_NOTIFIER", "AZP_DISABLE_UPDATE_CHECK"];
+  const keys = ["AZPIM_NO_UPDATE_NOTIFIER", "AZPIM_DISABLE_UPDATE_CHECK"];
   for (const key of keys) {
     const value = process.env[key];
     if (!value) continue;
@@ -97,7 +97,7 @@ const fetchLatestVersion = async (packageName: string, timeoutMs: number): Promi
       signal: controller.signal,
       headers: {
         accept: "application/json",
-        "user-agent": "azp-cli-update-check",
+        "user-agent": "azpim-update-check",
       },
     });
 

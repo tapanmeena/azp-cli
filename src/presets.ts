@@ -48,15 +48,15 @@ export type TemplateContext = {
   now?: Date;
 };
 
-const AZP_PRESETS_PATH_ENV = "AZP_PRESETS_PATH";
+const AZPIM_PRESETS_PATH_ENV = "AZPIM_PRESETS_PATH";
 
 export const getDefaultPresetsFilePath = (): string => {
-  const envOverride = process.env[AZP_PRESETS_PATH_ENV];
+  const envOverride = process.env[AZPIM_PRESETS_PATH_ENV];
   if (envOverride && envOverride.trim()) {
     return envOverride.trim();
   }
 
-  const appName = "azp-cli";
+  const appName = "azpim";
   const platform = process.platform;
 
   if (platform === "win32") {
@@ -77,7 +77,10 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
 const normalizeStringArray = (value: unknown): string[] | undefined => {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) return undefined;
-  const strings = value.filter((v) => typeof v === "string").map((v) => v.trim()).filter(Boolean);
+  const strings = value
+    .filter((v) => typeof v === "string")
+    .map((v) => v.trim())
+    .filter(Boolean);
   return strings;
 };
 
@@ -216,7 +219,7 @@ export const setDefaultPresetName = (data: PresetsFile, command: PresetCommandNa
 
 export const resolveActivatePresetOptions = (data: PresetsFile, presetName?: string): ActivatePresetOptions => {
   const base = data.defaults?.activate ?? {};
-  const fromPreset = presetName ? data.presets?.[presetName]?.activate ?? {} : {};
+  const fromPreset = presetName ? (data.presets?.[presetName]?.activate ?? {}) : {};
   return {
     subscriptionId: fromPreset.subscriptionId ?? base.subscriptionId,
     roleNames: fromPreset.roleNames ?? base.roleNames,
@@ -228,7 +231,7 @@ export const resolveActivatePresetOptions = (data: PresetsFile, presetName?: str
 
 export const resolveDeactivatePresetOptions = (data: PresetsFile, presetName?: string): DeactivatePresetOptions => {
   const base = data.defaults?.deactivate ?? {};
-  const fromPreset = presetName ? data.presets?.[presetName]?.deactivate ?? {} : {};
+  const fromPreset = presetName ? (data.presets?.[presetName]?.deactivate ?? {}) : {};
   return {
     subscriptionId: fromPreset.subscriptionId ?? base.subscriptionId,
     roleNames: fromPreset.roleNames ?? base.roleNames,

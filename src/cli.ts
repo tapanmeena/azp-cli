@@ -104,7 +104,7 @@ export const activateOnce = async (authContext: AuthContext, options: ActivateOn
   const durationHours = options.durationHours ?? 8;
   validateDurationHours(durationHours);
 
-  const justification = options.justification ?? "Activated via azp-cli";
+  const justification = options.justification ?? "Activated via azpim";
 
   if (!options.subscriptionId?.trim()) {
     throw new Error("Missing required flag: --subscription-id");
@@ -133,7 +133,7 @@ export const activateOnce = async (authContext: AuthContext, options: ActivateOn
     authContext.credential,
     selectedSubscription.subscriptionId,
     selectedSubscription.displayName,
-    authContext.userId
+    authContext.userId,
   );
 
   const eligibleByName = new Map<string, typeof eligibleRoles>();
@@ -156,7 +156,7 @@ export const activateOnce = async (authContext: AuthContext, options: ActivateOn
     if (matches.length > 1 && !options.allowMultiple) {
       if (options.nonInteractive) {
         throw new Error(
-          `Ambiguous --role-name="${name}" matched ${matches.length} eligible roles. Use --allow-multiple to activate all matches, or run without --non-interactive to select interactively.`
+          `Ambiguous --role-name="${name}" matched ${matches.length} eligible roles. Use --allow-multiple to activate all matches, or run without --non-interactive to select interactively.`,
         );
       }
 
@@ -283,7 +283,7 @@ export const activateOnce = async (authContext: AuthContext, options: ActivateOn
           durationHours,
           justification,
         },
-        selectedSubscription.subscriptionId
+        selectedSubscription.subscriptionId,
       );
       results.push({
         eligibilityId: target.eligibilityId,
@@ -329,7 +329,7 @@ export const activateOnce = async (authContext: AuthContext, options: ActivateOn
 };
 
 export const deactivateOnce = async (authContext: AuthContext, options: DeactivateOnceOptions): Promise<DeactivateOnceResult> => {
-  const justification = options.justification ?? "Deactivated via azp-cli";
+  const justification = options.justification ?? "Deactivated via azpim";
 
   const requestedRoleNames = (options.roleNames || []).map((n) => n.trim()).filter(Boolean);
   if (requestedRoleNames.length === 0) {
@@ -395,7 +395,7 @@ export const deactivateOnce = async (authContext: AuthContext, options: Deactiva
     if (matches.length > 1 && !options.allowMultiple) {
       if (options.nonInteractive) {
         throw new Error(
-          `Ambiguous --role-name="${name}" matched ${matches.length} active roles. Use --allow-multiple to deactivate all matches, or run without --non-interactive to select interactively.`
+          `Ambiguous --role-name="${name}" matched ${matches.length} active roles. Use --allow-multiple to deactivate all matches, or run without --non-interactive to select interactively.`,
         );
       }
 
@@ -529,7 +529,7 @@ export const deactivateOnce = async (authContext: AuthContext, options: Deactiva
         role.subscriptionId,
         authContext.userId,
         role.roleDefinitionId,
-        `${role.roleName} @ ${role.scopeDisplayName}`
+        `${role.roleName} @ ${role.scopeDisplayName}`,
       );
       results.push({
         assignmentId: target.assignmentId,
@@ -718,7 +718,7 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
       authContext.credential,
       selectedSubscription.subscriptionId,
       selectedSubscription.displayName,
-      authContext.userId
+      authContext.userId,
     );
 
     if (eligibleRoles.length === 0) {
@@ -765,7 +765,7 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
         type: "input",
         name: "justification",
         message: chalk.cyan("Justification for activation:"),
-        default: "Activated via azp-cli",
+        default: "Activated via azpim",
         validate: (value) => {
           if (value.trim().length >= 5) return true;
           return chalk.red("Justification should be at least 5 characters long.");
@@ -829,7 +829,7 @@ export const handleActivation = async (authContext: AuthContext): Promise<void> 
             durationHours: activationDetails.durationHours,
             justification: activationDetails.justification,
           },
-          selectedSubscription.subscriptionId
+          selectedSubscription.subscriptionId,
         );
         successCount++;
       } catch (error: any) {
@@ -996,7 +996,7 @@ export const handleDeactivation = async (authContext: AuthContext): Promise<void
           role.subscriptionId,
           authContext.userId,
           role.roleDefinitionId,
-          `${role.roleName} @ ${role.scopeDisplayName}`
+          `${role.roleName} @ ${role.scopeDisplayName}`,
         );
         successCount++;
       } catch (error: any) {

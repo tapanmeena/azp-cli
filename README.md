@@ -1,4 +1,4 @@
-# Azure PIM CLI (azp-cli)
+# Azure PIM CLI (azpim)
 
 A command-line interface tool for managing Azure Privileged Identity Management (PIM) role activations directly from your terminal.
 
@@ -21,7 +21,7 @@ A command-line interface tool for managing Azure Privileged Identity Management 
 
 ## Prerequisites
 
-Before using azp-cli, ensure you have:
+Before using azpim, ensure you have:
 
 1. **Node.js** (v18 or higher)
 2. **Azure CLI** installed and configured
@@ -46,23 +46,30 @@ az account show
 
 ```bash
 # Using npm
-npm install -g azp-cli
+npm install -g azpim
 
 # Using pnpm
-pnpm add -g azp-cli
+pnpm add -g azpim
 
 # Using yarn
-yarn global add azp-cli
+yarn global add azpim
 ```
 
-After installation, the `azp` command will be available globally.
+After installation, the `azpim` command will be available globally.
+
+### Migrating from azp-cli
+
+If you previously used `azp-cli`, your presets are stored in `~/.config/azp-cli/` (or `%APPDATA%\azp-cli\` on Windows). To migrate:
+
+1. Copy your `presets.json` to the new location: `~/.config/azpim/` (or `%APPDATA%\azpim\`)
+2. Uninstall the old package: `npm uninstall -g azp-cli`
 
 ### From Source (Development)
 
 ```bash
 # Clone the repository
-git clone https://github.com/tapanmeena/azp-cli.git
-cd azp-cli
+git clone https://github.com/tapanmeena/azpim.git
+cd azpim
 
 # Install dependencies
 pnpm install
@@ -80,13 +87,13 @@ npm link
 
 ```bash
 # After global installation
-azp
+azpim
 
 # Or with specific commands
-azp activate
-azp deactivate
-azp preset list
-azp update
+azpim activate
+azpim deactivate
+azpim preset list
+azpim update
 
 # Development mode (from source)
 pnpm dev
@@ -117,22 +124,22 @@ pnpm dev
 You can check if a newer version is available:
 
 ```bash
-azp update
+azpim update
 # alias
-azp upgrade
+azpim upgrade
 ```
 
 Notes:
 
-- `azp update` exits with code `0` when up-to-date, `2` when an update is available, and `1` on error.
+- `azpim update` exits with code `0` when up-to-date, `2` when an update is available, and `1` on error.
 - `--output json` returns a structured response suitable for scripts.
-- By default, `azp activate` and `azp deactivate` will also show a short “update available” hint (text mode only) at most once per day.
-- Disable update checks via `AZP_NO_UPDATE_NOTIFIER=1` (or `AZP_DISABLE_UPDATE_CHECK=1`).
+- By default, `azpim activate` and `azpim deactivate` will also show a short "update available" hint (text mode only) at most once per day.
+- Disable update checks via `AZPIM_NO_UPDATE_NOTIFIER=1` (or `AZPIM_DISABLE_UPDATE_CHECK=1`).
 
 The update-check cache is stored alongside presets in your config directory:
 
-- macOS/Linux: `~/.config/azp-cli/update-check.json` (or `$XDG_CONFIG_HOME/azp-cli/update-check.json`)
-- Windows: `%APPDATA%\azp-cli\update-check.json`
+- macOS/Linux: `~/.config/azpim/update-check.json` (or `$XDG_CONFIG_HOME/azpim/update-check.json`)
+- Windows: `%APPDATA%\azpim\update-check.json`
 
 ### Non-interactive Mode (Automation)
 
@@ -142,7 +149,7 @@ Use flags to activate or deactivate PIM roles directly without going through the
 
 ```bash
 # Activate a single role by name (non-interactive)
-azp activate --non-interactive --yes \
+azpim activate --non-interactive --yes \
    --subscription-id <SUBSCRIPTION_GUID> \
    --role-name "Owner" \
    --duration-hours 2 \
@@ -150,20 +157,20 @@ azp activate --non-interactive --yes \
    --output json
 
 # Activate multiple roles (repeat --role-name)
-azp activate --non-interactive --yes \
+azpim activate --non-interactive --yes \
    --subscription-id <SUBSCRIPTION_GUID> \
    --role-name "Contributor" \
    --role-name "User Access Administrator"
 
 # If a role name matches multiple eligible roles (different scopes),
 # --non-interactive will error unless you explicitly allow activating all matches
-azp activate --non-interactive --yes \
+azpim activate --non-interactive --yes \
    --subscription-id <SUBSCRIPTION_GUID> \
    --role-name "Contributor" \
    --allow-multiple
 
 # Preview what would happen without submitting requests
-azp activate --non-interactive --dry-run \
+azpim activate --non-interactive --dry-run \
    --subscription-id <SUBSCRIPTION_GUID> \
    --role-name "Contributor" \
    --output json
@@ -173,13 +180,13 @@ azp activate --non-interactive --dry-run \
 
 ```bash
 # Deactivate specific roles
-azp deactivate --non-interactive --yes \
+azpim deactivate --non-interactive --yes \
    --subscription-id <SUBSCRIPTION_GUID> \
    --role-name "Owner" \
    --justification "Task completed"
 
 # Deactivate across all subscriptions (omit subscription-id)
-azp deactivate --non-interactive --yes \
+azpim deactivate --non-interactive --yes \
    --role-name "Contributor" \
    --allow-multiple
 ```
@@ -214,12 +221,12 @@ Presets let you save your daily activation/deactivation routines (subscription +
 
 By default, presets are stored in a per-user config file:
 
-- macOS/Linux: `~/.config/azp-cli/presets.json` (or `$XDG_CONFIG_HOME/azp-cli/presets.json`)
-- Windows: `%APPDATA%\azp-cli\presets.json`
+- macOS/Linux: `~/.config/azpim/presets.json` (or `$XDG_CONFIG_HOME/azpim/presets.json`)
+- Windows: `%APPDATA%\azpim\presets.json`
 
 Override the location with:
 
-- `AZP_PRESETS_PATH=/path/to/presets.json`
+- `AZPIM_PRESETS_PATH=/path/to/presets.json`
 
 ### Preset contents
 
@@ -238,39 +245,39 @@ A preset can define one or both blocks:
 
 ```bash
 # Create a preset (interactive wizard)
-azp preset add daily-ops
+azpim preset add daily-ops
 
 # Create a preset with Azure integration (fetches subscriptions/roles)
-azp preset add daily-ops --from-azure
+azpim preset add daily-ops --from-azure
 
 # Edit a preset (interactive wizard)
-azp preset edit daily-ops
+azpim preset edit daily-ops
 
 # List all presets
-azp preset list
+azpim preset list
 
 # Show one preset details
-azp preset show daily-ops
+azpim preset show daily-ops
 
 # Remove a preset
-azp preset remove daily-ops
+azpim preset remove daily-ops
 
 # Use a preset (flags still override preset values)
-azp activate --preset daily-ops --yes
+azpim activate --preset daily-ops --yes
 
 # Non-interactive run using the preset
-azp activate --preset daily-ops --non-interactive --yes --output json
+azpim activate --preset daily-ops --non-interactive --yes --output json
 
 # Deactivate using a preset
-azp deactivate --preset daily-ops --non-interactive --yes
+azpim deactivate --preset daily-ops --non-interactive --yes
 ```
 
 ### Defaults
 
-When you create a preset via `azp preset add`, you can optionally set it as the default for `activate` and/or `deactivate`.
+When you create a preset via `azpim preset add`, you can optionally set it as the default for `activate` and/or `deactivate`.
 
 - Default presets are applied automatically when you run one-shot flows and you haven’t explicitly provided the required flags.
-- Example: after setting a default activate preset, `azp activate --non-interactive --yes` can work without specifying `--subscription-id`/`--role-name`.
+- Example: after setting a default activate preset, `azpim activate --non-interactive --yes` can work without specifying `--subscription-id`/`--role-name`.
 
 ### Example Session
 
@@ -375,7 +382,7 @@ pnpm publish
 ### Project Structure
 
 ```
-azp-cli/
+azpim/
 ├── src/
 │   ├── index.ts          # CLI entry point and command definitions
 │   ├── auth.ts           # Azure authentication handling

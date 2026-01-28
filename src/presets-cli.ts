@@ -135,7 +135,7 @@ const promptForAzureSelection = async (): Promise<{ authContext: AuthContext; su
     authContext.credential,
     selectedSubscription.subscriptionId,
     selectedSubscription.displayName,
-    authContext.userId
+    authContext.userId,
   );
 
   if (eligibleRoles.length === 0) {
@@ -173,7 +173,7 @@ const promptForAzureSelection = async (): Promise<{ authContext: AuthContext; su
   if (ambiguous.length > 0) {
     logBlank();
     logWarning(`Note: ${ambiguous.length} role name(s) have multiple eligible matches (different scopes): ${ambiguous.join(", ")}.`);
-    logDim("When running activate/deactivate, azp may prompt unless allowMultiple is enabled or selection is interactive.");
+    logDim("When running activate/deactivate, azpim may prompt unless allowMultiple is enabled or selection is interactive.");
   }
 
   return { authContext, subscriptionId, roleNames: cleanedRoles };
@@ -219,9 +219,9 @@ const promptForManualSelection = async (defaults?: {
 
 const promptForCommonFields = async (
   command: PresetCommandName,
-  defaults?: { justification?: string; allowMultiple?: boolean }
+  defaults?: { justification?: string; allowMultiple?: boolean },
 ): Promise<{ justification?: string; allowMultiple?: boolean }> => {
-  const defaultJustification = command === "activate" ? "Activated via azp-cli" : "Deactivated via azp-cli";
+  const defaultJustification = command === "activate" ? "Activated via azpim" : "Deactivated via azpim";
 
   const { justification } = await inquirer.prompt<{ justification: string }>([
     {
@@ -412,14 +412,14 @@ export const runPresetEditWizard = async (args: EditWizardArgs): Promise<PresetE
           roleNames: existingEntry.activate?.roleNames,
         }
       : appliesTo === "deactivate"
-      ? {
-          subscriptionId: existingEntry.deactivate?.subscriptionId,
-          roleNames: existingEntry.deactivate?.roleNames,
-        }
-      : {
-          subscriptionId: existingEntry.activate?.subscriptionId ?? existingEntry.deactivate?.subscriptionId,
-          roleNames: existingEntry.activate?.roleNames ?? existingEntry.deactivate?.roleNames,
-        };
+        ? {
+            subscriptionId: existingEntry.deactivate?.subscriptionId,
+            roleNames: existingEntry.deactivate?.roleNames,
+          }
+        : {
+            subscriptionId: existingEntry.activate?.subscriptionId ?? existingEntry.deactivate?.subscriptionId,
+            roleNames: existingEntry.activate?.roleNames ?? existingEntry.deactivate?.roleNames,
+          };
 
   let subscriptionId: string | undefined;
   let roleNames: string[] = [];

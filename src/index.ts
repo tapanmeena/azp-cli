@@ -98,7 +98,7 @@ const resolveValue = <T>(command: Command, optionName: string, cliValue: T, pres
 
 const program = new Command();
 
-program.name("azp").description("Azure PIM CLI - A CLI tool for Azure Privilege Identity Management (PIM)").version(version);
+program.name("azpim").description("Azure PIM CLI - A CLI tool for Azure Privilege Identity Management (PIM)").version(version);
 
 program
   .command("activate", { isDefault: true })
@@ -113,7 +113,7 @@ program
       list.push(value);
       return list;
     },
-    []
+    [],
   )
   .option("--duration-hours <n>", "Duration hours (1-8)", (value: string) => Number.parseInt(value, 10))
   .option("--justification <text>", "Justification for activation")
@@ -162,7 +162,7 @@ program
         if (!entry) {
           const names = listPresetNames(presets.data);
           throw new Error(
-            `Preset not found: "${explicitPresetName}". Presets file: ${presets.filePath}. Available: ${names.length ? names.join(", ") : "(none)"}`
+            `Preset not found: "${explicitPresetName}". Presets file: ${presets.filePath}. Available: ${names.length ? names.join(", ") : "(none)"}`,
           );
         }
         if (!entry.activate) {
@@ -239,7 +239,7 @@ program
       list.push(value);
       return list;
     },
-    []
+    [],
   )
   .option("--justification <text>", "Justification for deactivation")
   .option("--preset <name>", "Use a saved preset (fills defaults; flags still override)")
@@ -285,7 +285,7 @@ program
         if (!entry) {
           const names = listPresetNames(presets.data);
           throw new Error(
-            `Preset not found: "${explicitPresetName}". Presets file: ${presets.filePath}. Available: ${names.length ? names.join(", ") : "(none)"}`
+            `Preset not found: "${explicitPresetName}". Presets file: ${presets.filePath}. Available: ${names.length ? names.join(", ") : "(none)"}`,
           );
         }
         if (!entry.deactivate) {
@@ -349,7 +349,7 @@ program
 
 program
   .command("check-update")
-  .description("Check if a newer azp-cli version is available")
+  .description("Check if a newer azpim version is available")
   .alias("update")
   .option("--check-only", "Only check and print status (no upgrade instructions)")
   .option("--output <text|json>", "Output format", "text")
@@ -381,8 +381,8 @@ program
               upgradeCommands: result.updateAvailable ? upgradeCommands : undefined,
             },
             null,
-            2
-          )}\n`
+            2,
+          )}\n`,
         );
         process.exit(result.ok ? (result.updateAvailable ? 2 : 0) : 1);
       }
@@ -426,7 +426,7 @@ program
 
 program
   .command("help")
-  .description("Display help information about azp-cli commands")
+  .description("Display help information about azpim commands")
   .action(() => {
     showHeader();
     program.outputHelp();
@@ -434,10 +434,10 @@ program
 
 const presetCommand = program
   .command("preset")
-  .description("Manage azp-cli presets")
+  .description("Manage azpim presets")
   .addHelpText(
     "after",
-    `\nPresets file location:\n  ${getDefaultPresetsFilePath()}\n\nYou can override via environment variable AZP_PRESETS_PATH.\n`
+    `\nPresets file location:\n  ${getDefaultPresetsFilePath()}\n\nYou can override via environment variable AZPIM_PRESETS_PATH.\n`,
   );
 
 presetCommand
@@ -466,15 +466,15 @@ presetCommand
               presets: names,
             },
             null,
-            2
-          )}\n`
+            2,
+          )}\n`,
         );
         return;
       }
 
       logInfo(`Presets file: ${loaded.filePath}`);
       if (!loaded.exists) {
-        logDim("(File does not exist yet; use 'azp preset add' to create one.)");
+        logDim("(File does not exist yet; use 'azpim preset add' to create one.)");
       }
       logBlank();
 
